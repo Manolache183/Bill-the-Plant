@@ -1,0 +1,82 @@
+#include "LedControl.h"
+#include "LowPower.h"
+
+/*** Soil Moisture Sensor ***/
+#define MOISTURE_SENSOR_POWER 2
+#define SENSOR_PIN A0
+#define DRY_THRESHOLD 750
+#define WET_THRESHOLD 400
+
+/*** 8x8 Matrix ***/
+#define CS 10
+#define DIN 12
+#define CLK 11
+#define EMPTY_LED 0x00 // The value to be sent to the matrix to turn off a LED
+
+byte heart[8] = {0x00, 0x66, 0xFF, 0xFF, 0x7E, 0x3C, 0x18, 0x00};
+byte beer1[8] = {0xAC, 0xD4, 0xAF, 0x85, 0x85, 0x85, 0x87, 0xFC};
+byte beer2[8] = {0xD4, 0xAC, 0xD7, 0x85, 0x85, 0x85, 0x87, 0xFC};
+byte waterDrop[8] = {0x08, 0x1C, 0x3E, 0x6E, 0xEF, 0xDF, 0X7E, 0x3C};
+byte emptyLed = 0x00;
+
+LedControl lc = LedControl(DIN,CLK,CS,1);
+
+int readSoilMoisture() {
+  digitalWrite(MOISTURE_SENSOR_POWER, HIGH); // Turn the sensor ON
+  delay(10); // Allow power to settle
+  
+  int moisture = analogRead(SENSOR_PIN); // Measure the moisture
+  
+  digitalWrite(MOISTURE_SENSOR_POWER, LOW); // Turn the sensor OFF
+
+  return moisture;
+}
+
+void setup() {
+  /*** 8x8 Matrix ***/
+  lc.shutdown(0,false);
+  /* Set the brightness to a medium values */
+  lc.setIntensity(0,8);
+  /* and clear the display */
+  lc.clearDisplay(0);
+
+  /**** Soil Moisture Sensor ****/
+  pinMode(MOISTURE_SENSOR_POWER, OUTPUT);
+  digitalWrite(MOISTURE_SENSOR_POWER, LOW); // Turn the sensor OFF
+}
+
+void loop() {
+  int soilMoisture = readSoilMoisture();
+
+  if (soilMoisture < WET_THRESHOLD) {
+    for (int i = 0; i < 8; i++) {
+      lc.setRow(0, i, beer1[i]);
+    }
+
+    delay(200);
+
+    for (int i = 0; i < 8; i++) {
+      lc.setRow(0, i, beer2[i]);
+    }
+
+    delay(200);
+  } else if (soilMoisture < DRY_THRESHOLD) {
+    for (int i = 0; i < 8; i++) {
+      lc.setRow(0, i, heart[i]);
+    }
+
+    LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+  } else if (soilMoisture >= DRY_THRESHOLD) {
+    for (int i = 0; i < 8; i++) {
+      lc.setRow(0, i, waterDrop[i]);
+    }
+
+    delay(1000);
+
+    for (int i = 0; i < 8; i++) {
+      lc.setRow(0, i, EMPTY_LED);
+    }
+
+    delay(300);
+  }
+}
